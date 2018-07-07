@@ -58,6 +58,50 @@ function php_get_softwares() {
 }
 
 
-var_dump(parse_file_by_line('/var/spool/web-pbs/software/abaqus/version.conf'));
+function php_generate_qsub_scripts($software,$env) {
+	 $random_name=uniqid("qsub_");
+	 $script_name=path_join($GLOBALS['WEB_PBS_CONF']['CONFIG_PATH'],'scripts',$random_name);
+	 php_create_resource_head($script_name,$env);
+	 php_create_env($script_name,$env);
+	 php_append_script($script_name);
+	 return $script_name;
+}
+
+function  php_create_resource_head($script_name,$env) {
+	  $f=fopen($script_name,"a");
+	  fwrite($f,"#!/bin/bash\n");
+	  fclose($f);
+};
+
+function php_create_env($script_name,$env) {
+	 $f=fopen($script_name,"a");
+	 foreach ($env as $k => $v ) {
+	 	 fwrite($f,"#PBS -v " . $k . "=" . "\"" . $v . "\"" . "\n");
+	 };
+
+	 fclose($f);
+}
+
+function php_append_script($script_name) {
+	 $f=fopen($script_name,"a");
+	 fwrite($f,"/bin/sleep 100\n");
+	 fclose($f);
+}
+
+function php_qsub($software,$env,$user) {
+ 	 $cmd="sudo -u "  . $user . " /opt/pbs/default/bin/qsub ";
+	 $script_name=php_generate_qsub_scripts($software,$env);
+	 $submit_dir=path_join($GLOBALS["WEB_PBS_CONF"]["CONFIG_PATH"],"sessions");
+	 $cwd=getcwd();
+	 chdir($submit_dir);
+	 $jobid=shell_exec($cmd . $script_name );
+	 chdir($cwd);
+	 return $jobid;
+}
+$env=array();
+$env['LICENSE']='6200@12345';
+$env['TEST']='a b c';
+print php_qsub("abaqus",$env,"pbsadmin");
+
 
 ?>

@@ -75,7 +75,6 @@ function parse_softwares() {
 	 $GLOBALS['SOFTWARE']=$software;
 }
 
-
 parse_config_file();
 parse_softwares();
 
