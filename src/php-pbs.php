@@ -1,10 +1,59 @@
 <?php
 require 'utils.php';
-function php_qselect($a=array()) {
-	 $cmd='sudo /opt/pbs/default/bin/qselect';
-	 foreach ($a as $k=> $v) {
-	 	 $cmd = $cmd . " ". $k ." ". $v ;
+
+function get_pbs_exec() {
+	 $pbs_exec=get_global_conf("PBS_EXEC");
+	 if ($pbs_exec == "") {
+	    return '/opt/pbs/default';
+	 }
+	 return $pbs_exec;
+	   
+}
+
+function make_pbs_cmd($pbs_cmd,$user="") {
+	 if (!( $user == "" )) {
+	    $user_cmd=" -u " . $user;
+	 } else {
+	    $user_cmd="";
+	 }
+	 return 'sudo ' . $user_cmd . " " . path_join(get_pbs_exec(),'bin',$pbs_cmd) . " ";
+}
+
+function make_arg_cmd($a=array()) {
+	$cmd="";
+	foreach ($a as $k => $v) {
+		$cmd = $cmd . " " . $k . " " . $v;
+	}
+	return $cmd . " ";
+}
+
+
+function php_pbsnodes($a=array("-av" => "")) {
+	 $cmd=make_pbs_cmd('pbsnodes');
+	 $cmd=$cmd . " " . make_arg_cmd($a);
+	 $c=shell_exec($cmd);
+	 $n_out=array();
+
+	 $l=explode("\n",$c);
+	 foreach($l as $v) {
+	 	    if (strlen($v) >0 ) {
+		       		$p=explode("=",$v,2);
+				if (sizeof($p) == 1) {
+				   $current=$v;
+				   $n_out[$current]=array();
+				} else {
+				   $n_out[$current][trim($p[0])]=trim($p[1]);
+				}
+		    };
+
 	 };
+	 return $n_out;
+}
+
+
+function php_qselect($a=array()) {
+	 $cmd=make_pbs_cmd('qselect');
+	 $cmd = $cmd . " " . make_arg_cmd($a);
 	 $jobs=shell_exec($cmd . " 2>/dev/null");
 	 return	remove_empty_value(explode("\n",$jobs));
 };
@@ -17,10 +66,8 @@ function php_qstat_jobarray($jobid=array(),$a=array()) {
 	return $job_array;
 }
 function php_qstat_one_job($jobid,$a=array()) {
-	 $cmd='sudo /opt/pbs/default/bin/qstat';
-	 foreach ($a as $k=> $v) {
-	 	 $cmd = $cmd . " " . $k . " " . $v ; 
-	 };
+	 $cmd= make_pbs_cmd('qstat');
+	 $cmd= $cmd . " " . make_arg_cmd($a);
 	 $lines=explode("\n",str_replace("\n\t","",shell_exec($cmd . " ". $jobid . " 2>/dev/null")));
 	 $j=array();
 	 foreach ($lines as $l) {
@@ -34,7 +81,7 @@ function php_qstat_one_job($jobid,$a=array()) {
 		   $j[$t[0]]=$t[1];
 		 }
 	 };
-	 return $j;
+	 return remove_empty_key($j);
 }
 function php_qstat($job_array=array(),$a=array("-fx"=>"")) {
 	 if (sizeof($job_array) == 0 ) {
@@ -44,7 +91,7 @@ function php_qstat($job_array=array(),$a=array("-fx"=>"")) {
 }
 
 function php_qdel_one($jobid) {
-	 $cmd='sudo /opt/pbs/default/bin/qdel';
+	 $cmd=make_pbs_cmd('qdel');
 	 shell_exec($cmd . " " . $jobid);
 };
 
@@ -89,7 +136,7 @@ function php_append_script($script_name) {
 }
 
 function php_qsub($software,$env,$user) {
- 	 $cmd="sudo -u "  . $user . " /opt/pbs/default/bin/qsub ";
+	 $cmd=make_pbs_cmd("qsub",$user);
 	 $script_name=php_generate_qsub_scripts($software,$env);
 	 $submit_dir=path_join($GLOBALS["WEB_PBS_CONF"]["CONFIG_PATH"],"sessions");
 	 $cwd=getcwd();
@@ -101,7 +148,11 @@ function php_qsub($software,$env,$user) {
 $env=array();
 $env['LICENSE']='6200@12345';
 $env['TEST']='a b c';
-print php_qsub("abaqus",$env,"pbsadmin");
-
+//print php_qsub("abaqus",$env,"pbsadmin");
+//var_dump(php_qstat());
+//var_dump(php_pbsnodes());
+//var_dump(php_qselect());
+//var_dump(php_qstat());
+//var_dump(php_pbsnodes());
 
 ?>
