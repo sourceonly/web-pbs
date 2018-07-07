@@ -1,0 +1,24 @@
+
+* FUNCTION DESIGN
+  - [X] simulate qselect 
+    - php-qselect would return all jobs by default if no args is given
+    - php-qselect takes an array as qselect argument 
+      - if the argument key takes a follow argument value, set array key to argument key, set array value to argument value
+	 e.g. if you want to call `qselect -u test1`, generate array like   arg['-u']='test'
+	if no argument value is needed, set array value to ''
+	 e.g. if you want to call `qselect -x` generate array like arg['-x']=''
+	
+  - [X] simulate qstat
+    
+
+  - [ ] config up software 
+    - main config file is /etc/web-pbs.conf,  config is A=B per line, store it in array $GLOBALS['WEB_PBS_CONF']
+    - software list is read from directories in $CONFIG_PATH/software
+    - executable path is configure under $CONFIG_PATH/software/<this-software>/version.conf, A=B where A is version, B is executable path define
+  - [ ] qsub 
+    - generate qsub scritps 
+       - design resources request header
+       - export variable before calling real scripts 
+       - append script template 
+       - do a qsub
+  - [ ] runtime file browser
