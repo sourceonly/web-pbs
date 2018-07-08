@@ -83,6 +83,17 @@ function get_global_conf($key) {
 	 }
 	 return "";
 }
+function get_conf_from_file($k,$f) {
+	 $conf=parse_conf_file($f);
+	 if (array_key_exists($k,$conf)) {
+	    return $conf[$k];
+	 }
+	 return "";
+}
+
+function get_software_home($software) {
+	 return	 path.join(get_global_conf("CONFIG_PATH"),"software",$software);
+}
 parse_global_config_file();
 parse_softwares();
 

@@ -107,13 +107,25 @@ function php_get_softwares() {
 
 function php_generate_qsub_scripts($software,$env) {
 	 $random_name=uniqid("qsub_");
-	 $script_name=path_join($GLOBALS['WEB_PBS_CONF']['CONFIG_PATH'],'scripts',$random_name);
+	 $script_name=path_join(get_global_conf("CONFIG_PATH"),'scripts',$random_name);
 	 php_create_resource_head($script_name,$env);
 	 php_create_env($script_name,$env);
 	 php_append_script($script_name);
 	 return $script_name;
 }
 
+function php_generate_presubmit_script($env) {
+	 $random_name=uniqid("submit_");	     
+	 $script_name=path_join(get_global_conf("CONFIG_PATH"),'scripts',$random_name);
+	 $f=fopen($script_name,"w");
+	 foreach($env as $k => $v) {
+	 	      fwrite($f,"export " . $k. "=\"". $v . "\"\n");
+	 }
+	 
+
+	 fclose($f);
+	 return $script_name;
+}
 function  php_create_resource_head($script_name,$env) {
 	  $f=fopen($script_name,"a");
 	  fwrite($f,"#!/bin/bash\n");
@@ -125,7 +137,6 @@ function php_create_env($script_name,$env) {
 	 foreach ($env as $k => $v ) {
 	 	 fwrite($f,"#PBS -v " . $k . "=" . "\"" . $v . "\"" . "\n");
 	 };
-
 	 fclose($f);
 }
 
@@ -135,10 +146,12 @@ function php_append_script($script_name) {
 	 fclose($f);
 }
 
+
+
 function php_qsub($software,$env,$user) {
 	 $cmd=make_pbs_cmd("qsub",$user);
 	 $script_name=php_generate_qsub_scripts($software,$env);
-	 $submit_dir=path_join($GLOBALS["WEB_PBS_CONF"]["CONFIG_PATH"],"sessions");
+	 $submit_dir=path_join(get_global_conf('CONFIG_PATH'),"sessions");
 	 $cwd=getcwd();
 	 chdir($submit_dir);
 	 $jobid=shell_exec($cmd . $script_name );
@@ -154,5 +167,5 @@ $env['TEST']='a b c';
 //var_dump(php_qselect());
 //var_dump(php_qstat());
 //var_dump(php_pbsnodes());
-
+print php_generate_presubmit_script($env);
 ?>
