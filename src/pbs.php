@@ -1,51 +1,11 @@
 <?php
-
-
+require 'tool.php';
 class pbs {
   function __construct($conf) {
-    // $this->conf=array();
-    // $this->conf['LOGFILE']='/var/spool/web-pbs/logs/execute.log';
-    // $this->conf['PBS_EXEC']='/opt/pbs/default';
-    // $this->conf['TMP_DIR']="/var/spool/web-pbs/scripts";
-    // $this->conf['SESSIONDIR']="/var/spool/web-pbs/sessions";
-    // /* these should be setup while qsub */
-    // $this->conf['PRESUBMIT_TYPE']="/bin/bash";
-    // $this->conf['PRESUBMIT_TEMPLATE']="/var/spool/web-pbs/default/pre.sh";
-    // $this->conf['RUN_TYPE']="/bin/bash";
-    // $this->conf["RUN_TEMPLATE"]="/var/spool/web-pbs/default/run.sh";
-    
+    $this->tool=new tool();
     $this->conf=$conf;
     $this->output="";
 
-  }
-
-  function set_key($k,$v) {
-    $this->conf[$k]=$v;
-  }
-
-  function path_join() {
-    $args = func_get_args();
-    $paths = array();
-
-    foreach($args as $arg) {
-      $paths = array_merge($paths, (array)$arg);
-    }
-
-    foreach($paths as &$path) {
-      $path = trim($path, '/');
-    }
-
-    if (substr($args[0], 0, 1) == '/') {
-      $paths[0] = '/' . $paths[0];
-    }
-    return join('/', $paths);
-  }
-
-  function get_value($k,$default="") {
-    if (array_key_exists($k,$this->conf)) {
-      return $this->conf[$k];
-    }
-    return $default;
   }
 
   function get_user($a=array()) {
@@ -54,6 +14,7 @@ class pbs {
       return $a['-u'];
     }
   }
+  
   function make_pbs_cmd($pbs_cmd,$no_arg="",$a=array()) {
     $user=$this->get_user($a);
     if (!( $user == "" )) {
@@ -61,7 +22,7 @@ class pbs {
     } else {
       $user_cmd="";
     }
-    return 'sudo ' . $user_cmd . " " . $this->path_join($this->get_value('PBS_EXEC'),'bin',$pbs_cmd) . $this->make_arg_cmd($a) . " " . $no_arg;
+    return 'sudo ' . $user_cmd . " " . $this->tool->path_join($this->conf->get_value('PBS_EXEC'),'bin',$pbs_cmd) . $this->make_arg_cmd($a) . " " . $no_arg;
   }
 
 
@@ -77,7 +38,7 @@ class pbs {
   }
 
   function write_log($info) {
-    $file=$this->get_value('LOGFILE');
+    $file=$this->conf->get_value('LOGFILE');
     $f=fopen($file,"a");
     fwrite($f,date(DATE_ATOM) . "\t" . $info . "\n");
     fclose($f);
@@ -87,13 +48,13 @@ class pbs {
 
   
   function run_cmd($cmd) {
-    $logfile=$this->get_value('LOGFILE');
+    $logfile=$this->conf->get_value('LOGFILE');
     $descriptorspec = array(
 			    1 => array("pipe", "w"),  // stdout is a pipe that the child will write to
 			    2 => array("file", $logfile, "a") // stderr is a file to write to
 			    );
 
-    $cwd = $this->get_value("SESSIONDIR","/tmp");
+    $cwd = $this->conf->get_value("SESSIONDIR","/tmp");
     $env = array('some_option' => 'aeiou');
     $this->write_log("executing " . $cmd . " in " . $cwd);
     $process = proc_open($cmd, $descriptorspec, $pipes, $cwd, $env);
@@ -191,10 +152,10 @@ class pbs {
   function generate_qsub_scripts($dict) {
     $d=$this->generate_pair($dict);
     $random_name=uniqid("qsub_");
-    $tmpdir=$this->get_value("TMP_DIR","/tmp");
-    $script_name=$this->path_join($tmpdir,$random_name);
+    $tmpdir=$this->conf->get_value("TMP_DIR","/tmp");
+    $script_name=$this->tool->path_join($tmpdir,$random_name);
     
-    $run_type=$this->get_value("RUN_TYPE","/bin/bash");
+    $run_type=$this->conf->get_value("RUN_TYPE","/bin/bash");
     $f=fopen($script_name,"w");
     fwrite($f,"#!".trim($run_type)."\n");
     fclose($f);
@@ -208,7 +169,7 @@ class pbs {
   }
 
   function append_run_script($qsub_script) {
-    $run_template=$this->get_value("RUN_TEMPLATE");
+    $run_template=$this->conf->get_value("RUN_TEMPLATE");
     $f=fopen($run_template,"r");
     $c=fread($f,filesize($run_template));
     fclose($f);
@@ -242,10 +203,10 @@ class pbs {
 
   function generate_presubmit_script($d,$qsub_script) {
     $random_name=uniqid("pre_");
-    $tmpdir=$this->get_value("TMP_DIR","/tmp");
-    $script_name=$this->path_join($tmpdir,$random_name);
-    $presubmit_type=$this->get_value("PRESUBMIT_TYPE");
-    $presubmit_script=$this->get_value("PRESUBMIT_TEMPLATE");
+    $tmpdir=$this->conf->get_value("TMP_DIR","/tmp");
+    $script_name=$this->tool->path_join($tmpdir,$random_name);
+    $presubmit_type=$this->conf->get_value("PRESUBMIT_TYPE");
+    $presubmit_script=$this->conf->get_value("PRESUBMIT_TEMPLATE");
     
     $f=fopen($script_name,"w");
     fwrite($f,"#!/bin/bash\n"); 
@@ -277,9 +238,24 @@ class pbs {
     
 
   
+
 }
 
-//$a=new pbs_cmd();
+// $dict=array();
+// $dict['LOGFILE']='/var/spool/web-pbs/logs/execute.log';
+// $dict['PBS_EXEC']='/opt/pbs/default';
+// $dict['TMP_DIR']="/var/spool/web-pbs/scripts";
+// $dict['SESSIONDIR']="/var/spool/web-pbs/sessions";
+// /* these should be setup while qsub */
+// $dict['PRESUBMIT_TYPE']="/bin/bash";
+// $dict['PRESUBMIT_TEMPLATE']="/var/spool/web-pbs/default/pre.sh";
+// $dict['RUN_TYPE']="/bin/bash";
+// $dict["RUN_TEMPLATE"]="/var/spool/web-pbs/default/run.sh";
+
+
+//$conf=new conf($dict);
+  
+//$a=new pbs($conf);
 //var_dump($a->pbsnodes(array("-av"  => "")));
 //var_dump($a->qselect(array("-xu" => 'pbsadmin')));
 //var_dump($a->qstat());
@@ -289,14 +265,14 @@ class pbs {
 //$a->run_pbs_cmd('qselect',"", array("-x"  => ""));
 //$a->run_pbs_cmd('qselect',"", array("-u"  => "pbsadmin","-x" => ""));
 //print $a->output;
-/*$d=array("TEST"=>"LICENSE",
-	 "FILES"=> array("/tmp/a",
-			 "/tmp/b",
-			 "/tmp/c"),
-	 "LICENSE"=>"6200@pbs",
-	 "USERNAME"=>"source"
-	 );
-*/
-//print $a->qsub($d);
+// $d=array("TEST"=>"LICENSE",
+// 	 "FILES"=> array("/tmp/a",
+// 			 "/tmp/b",
+// 			 "/tmp/c"),
+// 	 "LICENSE"=>"6200@pbs",
+// 	 "USERNAME"=>"pbsadmin"
+// 	 );
+
+// print $a->qsub($d);
 
 ?>
