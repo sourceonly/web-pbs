@@ -15,19 +15,21 @@ class pbs {
     }
   }
   
-  function make_pbs_cmd($pbs_cmd,$no_arg="",$a=array()) {
+  function make_pbs_cmd($pbs_cmd,$a=array()) {
     $user=$this->get_user($a);
     if (!( $user == "" )) {
       $user_cmd=" -u " . $user;
     } else {
       $user_cmd="";
     }
-    return 'sudo ' . $user_cmd . " " . $this->tool->path_join($this->conf->get_value('PBS_EXEC'),'bin',$pbs_cmd) . $this->make_arg_cmd($a) . " " . $no_arg;
+
+
+    return 'sudo ' . $user_cmd . " " . $this->tool->path_join($this->conf->get_value('PBS_EXEC'),'bin',$pbs_cmd) . $this->make_arg_cmd($a) ;
   }
 
 
-  function run_pbs_cmd($pbs_cmd,$no_args="",$a=array()) {
-    return $this->run_cmd($this->make_pbs_cmd($pbs_cmd,$no_args,$a));
+  function run_pbs_cmd($pbs_cmd,$a=array()) {
+    return $this->run_cmd($this->make_pbs_cmd($pbs_cmd,$a));
   }
   function make_arg_cmd($a=array()) {
     $cmd="";
@@ -73,7 +75,7 @@ class pbs {
   }
 
   function pbsnodes ($a=array("-av"=>"")) {
-    $rc=$this->run_pbs_cmd("pbsnodes","",$a);
+    $rc=$this->run_pbs_cmd("pbsnodes",$a);
     $c=$this->output;
     $l=explode("\n",$c);
     $node=array();
@@ -94,7 +96,7 @@ class pbs {
     return $node;
   }
   function qselect($a=array()) {
-    $this->run_pbs_cmd('qselect',"",$a);
+    $this->run_pbs_cmd('qselect',$a);
     $c=$this->output;
     $jobs=array();
     foreach(explode("\n",$c) as $v) {
@@ -104,9 +106,10 @@ class pbs {
     return $jobs;
 
   }
-  function qstat_one_job($jobid,$a=array("-fx"=>"")) {
-    $this->run_pbs_cmd('qstat',$jobid,$a);
+  function qstat($a=array("-f" => "")) {
+    $this->run_pbs_cmd('qstat',$a);
     $c=$this->output;
+
     $lines=explode("\n",str_replace("\n\t","",$c));
 
     $j=array();
@@ -115,39 +118,25 @@ class pbs {
       $t=explode("=",$l,2);
       if (sizeof($t)==1) {
 	if (strlen($t[0]) > 0) {
-	  $j_name=explode(":",$t[0]);
-	  $j['JobID']=$j_name[1];
+	  $j_name=explode(":",$l);
+	  $jobid=trim($j_name[1]);
+	  $j[$jobid]=array();
 	};
       } else {
-	$j[$t[0]]=$t[1];
+	$j[$jobid][trim($t[0])]=trim($t[1]);
       }
     };
     return $j;
   }
-  function qstat_jobarray($jobid=array(),$a=array()) {
-    $job_array=array();
-    foreach ($jobid as $job) {
-      $j=$this->qstat_one_job($job,$a);
-      $job_array[$j['JobID']]=$j;
+  
+  function qdel($jobid) {
+    $a=array();
+    foreach($jobid as $k=>$v) {
+      $a[$k]="";
     }
-    return $job_array;
+    $this->run_pbs_cmd('qdel',$a);
   }
-  function qstat($job_array=array(),$a=array("-fx"=>"")) {
-    if (sizeof($job_array) == 0 ) {
-      $job_array=$this->qselect();
-    };
-    return $this->qstat_jobarray($job_array,$a);
-  }
-
-  function qdel_one($jobid) {
-    $this->run_pbs_cmd('qdel',$jobid,array());
-  }
-
-  function qdel($jobarray) {
-    foreach ($jobarray as $v) {
-      $this->qdel_one($v);
-    }
-  }
+  
 
   function generate_qsub_scripts($dict) {
     $d=$this->generate_pair($dict);
@@ -223,7 +212,6 @@ class pbs {
   }
 
   function qsub($d=array()) {
-
     $script_name=$this->generate_qsub_scripts($d);
 
     if (array_key_exists("USERNAME",$d)) {
@@ -231,50 +219,15 @@ class pbs {
     } else {
       $a=array();
     }
-    $this->run_pbs_cmd('qsub',$script_name,$a);
+    $a[$script_name]="";
+    $this->run_pbs_cmd('qsub',$a);
     $jobid=$this->output;
     return $jobid;
 
   }
-
-    
-
-  
-
-}
-
-// $dict=array();
-// $dict['LOGFILE']='/var/spool/web-pbs/logs/execute.log';
-// $dict['PBS_EXEC']='/opt/pbs/default';
-// $dict['TMP_DIR']="/var/spool/web-pbs/scripts";
-// $dict['SESSIONDIR']="/var/spool/web-pbs/sessions";
-// /* these should be setup while qsub */
-// $dict['PRESUBMIT_TYPE']="/bin/bash";
-// $dict['PRESUBMIT_TEMPLATE']="/var/spool/web-pbs/default/pre.sh";
-// $dict['RUN_TYPE']="/bin/bash";
-// $dict["RUN_TEMPLATE"]="/var/spool/web-pbs/default/run.sh";
+};
 
 
-//$conf=new conf($dict);
-  
-//$a=new pbs($conf);
-//var_dump($a->pbsnodes(array("-av"  => "")));
-//var_dump($a->qselect(array("-xu" => 'pbsadmin')));
-//var_dump($a->qstat());
-//$a->qdel(array("232"));
-
-//$a->run_pbs_cmd('qstat',"", array("-fx"  => ""));
-//$a->run_pbs_cmd('qselect',"", array("-x"  => ""));
-//$a->run_pbs_cmd('qselect',"", array("-u"  => "pbsadmin","-x" => ""));
-//print $a->output;
-// $d=array("TEST"=>"LICENSE",
-// 	 "FILES"=> array("/tmp/a",
-// 			 "/tmp/b",
-// 			 "/tmp/c"),
-// 	 "LICENSE"=>"6200@pbs",
-// 	 "USERNAME"=>"pbsadmin"
-// 	 );
-
-// print $a->qsub($d);
+//$a=new pbs($global_conf);
 
 ?>

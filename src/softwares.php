@@ -34,8 +34,10 @@ class software {
   }
   function software_qsub($a=array()) {
     $a['SOFTWARE']=$this->software;
+
     $env_file=$this->tool->path_join($this->conf->get_value("SERVICE_HOME"),'software',$this->software,'env');
     $env=$this->tool->parse_file_to_dict($env_file);
+
     foreach ($env as $k => $v) {
       if (array_key_exists($k,$a)) {
 	continue;
@@ -58,6 +60,4 @@ $d=array("TEST"=>"LICENSE",
 
 
 $a=new software('abaqus',$global_conf);
-
 print $a->software_qsub($d);
-
