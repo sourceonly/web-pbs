@@ -10,25 +10,40 @@ class software {
   }
   function create_pbs_conf() {
     $dict=array();
-    $keys=array("LOGFILE" => '/var/spool/web-pbs/logs/execute.log',
-		"PBS_EXEC" => '/opt/pbs/default',
-		"TMP_DIR" => '/var/spool/web-pbs/scripts',
-		"SESSIONDIR" => "/var/spool/web-pbs/sessions",
-		'PRESUBMIT_TYPE' => "/bin/bash",
-		//		'PRESUBMIT_TEMPLATE' => "/var/spool/web-pbs/default/presubmit",
-		'RUN_TYPE' => "/bin/bash",
-		//		"RUN_TEMPLATE" => "/var/spool/web-pbs/default/run.sh"
-		);
+    $keys=array("LOGFILE" => '',
+		"PBS_EXEC" => '',
+		"TMP_DIR" => '',
+		"SESSIONDIR" => '',
+		'PRESUBMIT_TYPE' => "",
+		'RUN_TYPE' => ""		);
     foreach($keys as $k => $v) {
       $dict[$k]=$this->conf->get_value($k,$v);
     }
     $software_home=$this->tool->path_join($this->conf->get_value("SERVICE_HOME","/var/spool/web-pbs"),'software',$this->software);
+    $software_config_file=$this->tool->path_join($this->conf->get_value("SERVICE_HOME","/var/spool/web-pbs"),'software',$this->software,'config');
     $dict["PRESUBMIT_TEMPLATE"]=$this->tool->path_join($software_home,'presubmit');
     $dict["RUN_TEMPLATE"]=$this->tool->path_join($software_home,'run.sh');
+    
+    $b=$this->tool->parse_file_to_dict($software_config_file);
+    foreach($b as $k => $v) {
+      $dict[$k]=$v;
+    }
+    
     $pbs_conf=new conf($dict);
     return $pbs_conf;
   }
-  
+  function software_qsub($a=array()) {
+    $a['SOFTWARE']=$this->software;
+    $env_file=$this->tool->path_join($this->conf->get_value("SERVICE_HOME"),'software',$this->software,'env');
+    $env=$this->tool->parse_file_to_dict($env_file);
+    foreach ($env as $k => $v) {
+      if (array_key_exists($k,$a)) {
+	continue;
+      }
+      $a[$k]=$v;
+    }
+    return $this->pbs->qsub($a);
+  }
 };
 
 
@@ -41,8 +56,8 @@ $d=array("TEST"=>"LICENSE",
 	 "USERNAME"=>"pbsadmin"
 	 );
 
-$conf=new conf();
-$a=new software('abaqus',$conf);
 
-print $a->pbs->qsub($d);
+$a=new software('abaqus',$global_conf);
+
+print $a->software_qsub($d);
 

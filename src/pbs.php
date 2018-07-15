@@ -1,5 +1,5 @@
 <?php
-require 'tool.php';
+require 'constant.php';
 class pbs {
   function __construct($conf) {
     $this->tool=new tool();
@@ -194,10 +194,13 @@ class pbs {
     return $d;
   }
   function generate_env($qsub_script,$d) {
+    var_dump($d);
     $f=fopen($qsub_script,"a");
-    foreach($d as $k=>$v) {
- 	 fwrite($f,"#PBS -v " . $k . "=" . "\"" . $v . "\"" . "\n");
+    fwrite($f,"#PBS -v ");
+    foreach($d as $k => $v ) {
+      fwrite($f, "\"" .  $k . "=" . "'" . $v . "'" . "\",");
     }
+    fwrite($f,"\n");
     fclose($f);
   }
 

@@ -20,13 +20,30 @@ class tool {
     }
     return join('/', $paths);
   }
-  
+  function parse_file_to_dict($file_name) {
+    if (!file_exists($file_name))  {
+      return array();
+    }
+    $a=array();
+    $c=file_get_contents($file_name) ;
+    $lines=explode("\n",$c);
+    foreach ($lines as $l) {
+      if (trim($l) == "") {
+	continue;
+      }
+      $p=explode("=",$l,2);
+      if (sizeof($p) == 2) {
+	$a[trim($p[0])]=trim($p[1]);
+      }
+    }
+    return $a;
+  }
 };
 class conf {
   function __construct($dict=array()) {
     $this->conf=$dict;
   }
-  function set_key($k,$v) {
+  function set_key_value($k,$v) {
     $this->conf[$k]=$v;
   }
   function get_value($k,$default="") {

@@ -1,28 +1,15 @@
 <?php
-define("LINE_IS_PAIR",1);
-define("LINE_IS_SINGLE",2);
-define("LINE_IS_BLANK",3);
+require 'tool.php';
+$global_conf=new conf(array());
+$t=new tool();
+$global_conf->set_key_value("SERVICE_HOME","/var/spool/web-pbs");
+$global_conf->set_key_value("PBS_EXEC","/opt/pbs/default");
+$global_conf->set_key_value("LOGFILE",$t->path_join($global_conf->get_value("SERVICE_HOME"),"logs","execute.log"));
+$global_conf->set_key_value("TMP_DIR",$t->path_join($global_conf->get_value("SERVICE_HOME"),"scripts"));
+$global_conf->set_key_value("SESSIONDIR",$t->path_join($global_conf->get_value("SERVICE_HOME"),"sessions"));
+$global_conf->set_key_value("PRESUBMIT_TYPE","/bin/bash");
+$global_conf->set_key_value("RUN_TYPE","/bin/bash");
 
 
-class d_conf {
-  var $conf;
-  function __construct() {
-    $this->conf['G_CONF_FILE']='/etc/web-pbs.conf';
-    $this->conf['G_SERVICE_HOME']='/var/spool/web-pbs';
-    $this->conf['G_PRESUBMIT_SCRIPT']='presubmit';
-    $this->conf['G_PRESUBMIT_TYPE']='/bin/bash';
-    $this->conf['G_RUN_SCRIPT']='run.sh';
-    $this->conf['G_RUN_TYPE']='/bin/bash';
-    
-  }
-
-  function get_value($key,$default="") {
-    if (array_key_exists($key,$this->conf)) {
-      return $this->conf[$key];
-    }
-    return $default;
-  }
 
 
-}
-?>
