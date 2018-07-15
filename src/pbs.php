@@ -65,10 +65,10 @@ class pbs {
       // It is important that you close any pipes before calling
       // proc_close in order to avoid a deadlock
       $return_value = proc_close($process);
-      $this->write_log("executed " . $cmd . " code " . strval($return_value));
+      $this->write_log("executed  " . $cmd . " code " . strval($return_value));
       return $return_value;
     }
-    $this->write_log("executed " . $cmd . " failed");
+    $this->write_log("executed  " . $cmd . " failed");
     Die();
   }
 
@@ -194,7 +194,6 @@ class pbs {
     return $d;
   }
   function generate_env($qsub_script,$d) {
-    var_dump($d);
     $f=fopen($qsub_script,"a");
     fwrite($f,"#PBS -v ");
     foreach($d as $k => $v ) {
