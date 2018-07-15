@@ -1,22 +1,73 @@
 <?php
-require 'conf.php';
+
+
 class pbs {
-  var $conf;
-  function __construct() {
-    $this->conf=new g_conf;
+  function __construct($conf) {
+    // $this->conf=array();
+    // $this->conf['LOGFILE']='/var/spool/web-pbs/logs/execute.log';
+    // $this->conf['PBS_EXEC']='/opt/pbs/default';
+    // $this->conf['TMP_DIR']="/var/spool/web-pbs/scripts";
+    // $this->conf['SESSIONDIR']="/var/spool/web-pbs/sessions";
+    // /* these should be setup while qsub */
+    // $this->conf['PRESUBMIT_TYPE']="/bin/bash";
+    // $this->conf['PRESUBMIT_TEMPLATE']="/var/spool/web-pbs/default/pre.sh";
+    // $this->conf['RUN_TYPE']="/bin/bash";
+    // $this->conf["RUN_TEMPLATE"]="/var/spool/web-pbs/default/run.sh";
+    
+    $this->conf=$conf;
+    $this->output="";
+
   }
-  function get_pbs_exec() {
-    return $this->conf->get_key("PBS_EXEC");
+
+  function set_key($k,$v) {
+    $this->conf[$k]=$v;
   }
-  function make_pbs_cmd($pbs_cmd,$user="") {
+
+  function path_join() {
+    $args = func_get_args();
+    $paths = array();
+
+    foreach($args as $arg) {
+      $paths = array_merge($paths, (array)$arg);
+    }
+
+    foreach($paths as &$path) {
+      $path = trim($path, '/');
+    }
+
+    if (substr($args[0], 0, 1) == '/') {
+      $paths[0] = '/' . $paths[0];
+    }
+    return join('/', $paths);
+  }
+
+  function get_value($k,$default="") {
+    if (array_key_exists($k,$this->conf)) {
+      return $this->conf[$k];
+    }
+    return $default;
+  }
+
+  function get_user($a=array()) {
+    $user="";
+    if (array_key_exists('-u',$a)) {
+      return $a['-u'];
+    }
+  }
+  function make_pbs_cmd($pbs_cmd,$no_arg="",$a=array()) {
+    $user=$this->get_user($a);
     if (!( $user == "" )) {
       $user_cmd=" -u " . $user;
     } else {
       $user_cmd="";
     }
-    return 'sudo ' . $user_cmd . " " . path_join($this->get_pbs_exec(),'bin',$pbs_cmd) . " ";
+    return 'sudo ' . $user_cmd . " " . $this->path_join($this->get_value('PBS_EXEC'),'bin',$pbs_cmd) . $this->make_arg_cmd($a) . " " . $no_arg;
   }
 
+
+  function run_pbs_cmd($pbs_cmd,$no_args="",$a=array()) {
+    return $this->run_cmd($this->make_pbs_cmd($pbs_cmd,$no_args,$a));
+  }
   function make_arg_cmd($a=array()) {
     $cmd="";
     foreach ($a as $k => $v) {
@@ -24,45 +75,82 @@ class pbs {
     }
     return $cmd . " ";
   }
-  function php_pbsnodes($a=array("-av" => "")) {
-    $cmd=$this->make_pbs_cmd('pbsnodes');
-    $cmd=$cmd . " " . $this->make_arg_cmd($a);
-    $c=shell_exec($cmd);
-    $n_out=array();
 
+  function write_log($info) {
+    $file=$this->get_value('LOGFILE');
+    $f=fopen($file,"a");
+    fwrite($f,date(DATE_ATOM) . "\t" . $info . "\n");
+    fclose($f);
+  }
+    
+    
+
+  
+  function run_cmd($cmd) {
+    $logfile=$this->get_value('LOGFILE');
+    $descriptorspec = array(
+			    1 => array("pipe", "w"),  // stdout is a pipe that the child will write to
+			    2 => array("file", $logfile, "a") // stderr is a file to write to
+			    );
+
+    $cwd = $this->get_value("SESSIONDIR","/tmp");
+    $env = array('some_option' => 'aeiou');
+    $this->write_log("executing " . $cmd . " in " . $cwd);
+    $process = proc_open($cmd, $descriptorspec, $pipes, $cwd, $env);
+    if (is_resource($process)) {
+      $this->output=stream_get_contents($pipes[1]);
+      fclose($pipes[1]);
+      
+      // It is important that you close any pipes before calling
+      // proc_close in order to avoid a deadlock
+      $return_value = proc_close($process);
+      $this->write_log("executed " . $cmd . " code " . strval($return_value));
+      return $return_value;
+    }
+    $this->write_log("executed " . $cmd . " failed");
+    Die();
+  }
+
+  function pbsnodes ($a=array("-av"=>"")) {
+    $rc=$this->run_pbs_cmd("pbsnodes","",$a);
+    $c=$this->output;
     $l=explode("\n",$c);
-    foreach($l as $v) {
-      $line_type=get_line_type($v);
-      if ($line_type == LINE_IS_SINGLE) {
-	  $current=$v;
-	  $n_out[$current]=array();
-      } 
-      if ($line_type == LINE_IS_BLANK) {
-	
+    $node=array();
+    foreach ($l as $v) {
+      if (trim($v)=="") {
+	continue;
       }
-
-      if ($line_type == LINE_IS_PAIR) {
-	$p=explode("=",$v,2);
-	$n_out[$current][trim($p[0])]=trim($p[1]);
+      $lp=explode("=",$v,2);
+      if (sizeof($lp)==1) {
+	$node[trim($v)]=array();
+	$current=trim($v);
+	continue;
       }
-    };
-    return $n_out;
+      if (sizeof($lp)==2) {
+	$node[$current][trim($lp[0])]=trim($lp[1]);
+      }
+    }
+    return $node;
   }
+  function qselect($a=array()) {
+    $this->run_pbs_cmd('qselect',"",$a);
+    $c=$this->output;
+    $jobs=array();
+    foreach(explode("\n",$c) as $v) {
+      if (trim($v) == "") continue;
+      $jobs[]=$v;
+    }
+    return $jobs;
 
-
-  function php_qselect($a=array()) {
-    $cmd=$this->make_pbs_cmd('qselect');
-    $cmd = $cmd . " " . $this->make_arg_cmd($a);
-    $jobs=shell_exec($cmd . " 2>/dev/null");
-    return remove_empty_value(explode("\n",$jobs));
   }
+  function qstat_one_job($jobid,$a=array("-fx"=>"")) {
+    $this->run_pbs_cmd('qstat',$jobid,$a);
+    $c=$this->output;
+    $lines=explode("\n",str_replace("\n\t","",$c));
 
-  function php_qstat_one_job($jobid,$a=array()) {
-    $cmd= $this->make_pbs_cmd('qstat');
-    $cmd= $cmd . " " . $this->make_arg_cmd($a);
-    $lines=explode("\n",str_replace("\n\t","",shell_exec($cmd . " ". $jobid . " 2>/dev/null")));
     $j=array();
     foreach ($lines as $l) {
+      if (trim($l)=="") continue;
       $t=explode("=",$l,2);
       if (sizeof($t)==1) {
 	if (strlen($t[0]) > 0) {
@@ -73,112 +161,142 @@ class pbs {
 	$j[$t[0]]=$t[1];
       }
     };
-    return remove_empty_key($j);
+    return $j;
   }
-
-  function php_qstat_jobarray($jobid=array(),$a=array()) {
+  function qstat_jobarray($jobid=array(),$a=array()) {
     $job_array=array();
     foreach ($jobid as $job) {
-      $j=$this->php_qstat_one_job($job,$a);
+      $j=$this->qstat_one_job($job,$a);
       $job_array[$j['JobID']]=$j;
     }
     return $job_array;
   }
-
-  function php_qstat($job_array=array(),$a=array("-fx"=>"")) {
+  function qstat($job_array=array(),$a=array("-fx"=>"")) {
     if (sizeof($job_array) == 0 ) {
-      $job_array=$this->php_qselect();
+      $job_array=$this->qselect();
     };
-    return $this->php_qstat_jobarray($job_array,$a);
+    return $this->qstat_jobarray($job_array,$a);
   }
 
-  function php_qdel_one($jobid) {
-    $cmd=$this->make_pbs_cmd('qdel');
-    shell_exec($cmd . " " . $jobid);
+  function qdel_one($jobid) {
+    $this->run_pbs_cmd('qdel',$jobid,array());
   }
 
-  function php_qdel($jobarray) {
+  function qdel($jobarray) {
     foreach ($jobarray as $v) {
-      $this->php_qdel_one($v);
+      $this->qdel_one($v);
     }
   }
 
-  function php_generate_qsub_scripts($software,$env) {
+  function generate_qsub_scripts($dict) {
+    $d=$this->generate_pair($dict);
     $random_name=uniqid("qsub_");
-    $script_name=path_join($this->conf->get_temp_dir(),$random_name);
-    $this->php_create_resource_head($script_name);
-    $this->php_generate_presubmit_script($software,$env,$script_name);
-    $this->php_generate_env($script_name,$env);
-    $this->php_append_run_script($script_name,$software);
-    shell_exec("sudo chmod +x " . $script_name);
+    $tmpdir=$this->get_value("TMP_DIR","/tmp");
+    $script_name=$this->path_join($tmpdir,$random_name);
+    
+    $run_type=$this->get_value("RUN_TYPE","/bin/bash");
+    $f=fopen($script_name,"w");
+    fwrite($f,"#!".trim($run_type)."\n");
+    fclose($f);
+    shell_exec("chmod +x " . $script_name );
+    
+    $this->generate_presubmit_script($d,$script_name);
+    $this->generate_env($script_name,$d);
+    $this->append_run_script($script_name);
+    
     return $script_name;
   }
-  function php_generate_env($qsub_script,$env) {
-    
-    $f=fopen($qsub_script,"a");
-    foreach($env as $k=>$v) {
- 	 fwrite($f,"#PBS -v " . $k . "=" . "\"" . $v . "\"" . "\n");
-    }
-    
-    fclose($f);
-  }
-  function php_append_run_script($qsub_script,$software) {
-    $run_script=$this->conf->get_software_script($software);
-    $f=fopen($run_script,"r");
-    $c=fread($f,filesize($run_script));
+
+  function append_run_script($qsub_script) {
+    $run_template=$this->get_value("RUN_TEMPLATE");
+    $f=fopen($run_template,"r");
+    $c=fread($f,filesize($run_template));
     fclose($f);
     $f=fopen($qsub_script,"a");
     fwrite($f,$c);
     fclose($f);
   }
 
-  function php_generate_presubmit_script($software,$env,$qsub_script) {
+  function generate_pair($dict) {
+    $d=array();
+    foreach ($dict as $k => $v) {
+      if ( gettype($v) == gettype(array())) {
+	$d[$k]=implode(";",$v);
+	continue;
+      }
+      if (gettype($v)==gettype("")) {
+	$d[$k]=$v;
+	continue;
+      }
+
+    }
+    return $d;
+  }
+  function generate_env($qsub_script,$d) {
+    $f=fopen($qsub_script,"a");
+    foreach($d as $k=>$v) {
+ 	 fwrite($f,"#PBS -v " . $k . "=" . "\"" . $v . "\"" . "\n");
+    }
+    fclose($f);
+  }
+
+  function generate_presubmit_script($d,$qsub_script) {
     $random_name=uniqid("pre_");
-    $script_name=path_join($this->conf->get_temp_dir(),$random_name);
+    $tmpdir=$this->get_value("TMP_DIR","/tmp");
+    $script_name=$this->path_join($tmpdir,$random_name);
+    $presubmit_type=$this->get_value("PRESUBMIT_TYPE");
+    $presubmit_script=$this->get_value("PRESUBMIT_TEMPLATE");
+    
     $f=fopen($script_name,"w");
-    fwrite($f,"#!/bin/bash\n");
-    foreach ($env as $k => $v) {
+    fwrite($f,"#!/bin/bash\n"); 
+    foreach ($d as $k => $v) {
       fwrite($f, "export " . $k . "=\"".$v."\"\n");
     }
-    fwrite($f, $this->conf->get_software_presubmit($software) . " 1>>" . $qsub_script . " 2>" . $script_name . ".log");
+    fwrite($f, $presubmit_type . " " . $presubmit_script . " "  .  " 1>>" . $qsub_script . " 2>" . $script_name . ".log");
     fclose($f);
     shell_exec("sudo chmod +x " . $script_name);
     shell_exec($script_name);
     return $script_name;
   }
-  function php_create_resource_head($script_name) {
-    $f=fopen($script_name,"w");
-    fwrite($f,"#!/usr/bin/env ". $this->conf->get_key("RUN_TYPE") . "\n");
-    fclose($f);
+
+  function qsub($d=array()) {
+
+    $script_name=$this->generate_qsub_scripts($d);
+
+    if (array_key_exists("USERNAME",$d)) {
+      $a=array("-u" => $d["USERNAME"]);
+    } else {
+      $a=array();
+    }
+    $this->run_pbs_cmd('qsub',$script_name,$a);
+    $jobid=$this->output;
+    return $jobid;
+
   }
 
-  function php_qsub($software,$env,$user) {
-    $cmd=$this->make_pbs_cmd("qsub",$user);
-    $script_name=$this->php_generate_qsub_scripts($software,$env);
-    $submit_dir=$this->conf->get_submission_dir();
-    $cwd=getcwd();
-    chdir($submit_dir);
-    $jobid=shell_exec($cmd . $script_name );
-    chdir($cwd);
-    return $jobid;
-  }
+    
 
   
-
 }
-$p=new pbs();
 
-// $a=array("-f" => "", "-l" => "select=1:ncpus=8");
-// print $p->get_pbs_exec();
-// print $p->make_pbs_cmd("qstat");
-// print "\n";
-// print $p->make_pbs_cmd("qstat","pbsadmin");
-// print "\n";
-// var_dump( $p->php_pbsnodes());
-// var_dump($p->php_qselect());
-// var_dump($p->php_qstat(array("100")));
-// var_dump($p->php_qstat());
-// $p->php_qdel(array("120","121"));
-$env=array("test"=>"a","LICENSE"=>"9200@localohst");
-print $p->php_qsub("abaqus",$env,"pbsadmin");
+//$a=new pbs_cmd();
+//var_dump($a->pbsnodes(array("-av"  => "")));
+//var_dump($a->qselect(array("-xu" => 'pbsadmin')));
+//var_dump($a->qstat());
+//$a->qdel(array("232"));
+
+//$a->run_pbs_cmd('qstat',"", array("-fx"  => ""));
+//$a->run_pbs_cmd('qselect',"", array("-x"  => ""));
+//$a->run_pbs_cmd('qselect',"", array("-u"  => "pbsadmin","-x" => ""));
+//print $a->output;
+/*$d=array("TEST"=>"LICENSE",
+	 "FILES"=> array("/tmp/a",
+			 "/tmp/b",
+			 "/tmp/c"),
+	 "LICENSE"=>"6200@pbs",
+	 "USERNAME"=>"source"
+	 );
+*/
+//print $a->qsub($d);
+
 ?>
