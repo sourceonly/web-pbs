@@ -1,8 +1,0 @@
-#!/bin/bash
-#PBS -N 6200@pbs
-#PBS -l select=1:ncpus=1
-#PBS -v "TEST='LICENSE'","FILES='/tmp/a;/tmp/b;/tmp/c'","LICENSE='6200@pbs'","USERNAME='pbsadmin'","SOFTWARE='abaqus'",
-env 
-echo $LICENSE
-echo $test
-/bin/sleep 10
