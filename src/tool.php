@@ -38,6 +38,28 @@ class tool {
     }
     return $a;
   }
+  function parse_config_file($file_name) {
+    if (!file_exists($file_name))  {
+      return array();
+    }
+    $a=array();
+    $c=file_get_contents($file_name) ;
+    $lines=explode("\n",$c);
+    foreach ($lines as $l) {
+      if (trim($l) == "") {
+	continue;
+      }
+      $p=explode("=",$l,2);
+      if (sizeof($p)==1 ) {
+	$current=trim($l);
+	$a[$current]==array();
+      }
+      if (sizeof($p) == 2) {
+	$a[$current][trim($p[0])]=trim($p[1]);
+      }
+    }
+    return $a;
+  }
 };
 class conf {
   function __construct($dict=array()) {

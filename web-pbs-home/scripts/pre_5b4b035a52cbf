@@ -1,0 +1,7 @@
+#!/bin/bash
+export TEST="LICENSE"
+export FILES="/tmp/a;/tmp/b;/tmp/c"
+export LICENSE="6200@pbs"
+export USERNAME="pbsadmin"
+export SOFTWARE="abaqus"
+/bin/bash /var/spool/web-pbs/software/abaqus/presubmit  1>>/var/spool/web-pbs/scripts/qsub_5b4b035a52251 2>/var/spool/web-pbs/scripts/pre_5b4b035a52cbf.log

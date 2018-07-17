@@ -1,0 +1,5 @@
+#!/bin/bash
+cat << EOF 
+#PBS -N $LICENSE
+#PBS -l select=1:ncpus=1
+EOF

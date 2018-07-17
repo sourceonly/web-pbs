@@ -5,6 +5,9 @@ class software {
     $this->tool=new tool();
     $this->software=$software;
     $this->conf=$conf;
+    
+    $this->software_home=$this->tool->path_join($this->conf->get_value("SERVICE_HOME","/var/spool/web-pbs"),'software',$this->software);
+    $this->input=$this->tool->parse_config_file($this->tool->path_join($this->software_home,'input'));
     $pbs_conf=$this->create_pbs_conf();
     $this->pbs=new pbs($pbs_conf);
   }
@@ -19,10 +22,11 @@ class software {
     foreach($keys as $k => $v) {
       $dict[$k]=$this->conf->get_value($k,$v);
     }
-    $software_home=$this->tool->path_join($this->conf->get_value("SERVICE_HOME","/var/spool/web-pbs"),'software',$this->software);
+    $software_home=$this->software_home;
     $software_config_file=$this->tool->path_join($this->conf->get_value("SERVICE_HOME","/var/spool/web-pbs"),'software',$this->software,'config');
     $dict["PRESUBMIT_TEMPLATE"]=$this->tool->path_join($software_home,'presubmit');
     $dict["RUN_TEMPLATE"]=$this->tool->path_join($software_home,'run.sh');
+
     
     $b=$this->tool->parse_file_to_dict($software_config_file);
     foreach($b as $k => $v) {
@@ -32,7 +36,7 @@ class software {
     $pbs_conf=new conf($dict);
     return $pbs_conf;
   }
-  function software_qsub($a=array()) {
+  function software_qsub($d=array()) {
     $a['SOFTWARE']=$this->software;
 
     $env_file=$this->tool->path_join($this->conf->get_value("SERVICE_HOME"),'software',$this->software,'env');
@@ -58,6 +62,7 @@ $d=array("TEST"=>"LICENSE",
 	 "USERNAME"=>"pbsadmin"
 	 );
 
-
-$a=new software('abaqus',$global_conf);
-print $a->software_qsub($d);
+  
+  $a=new software('abaqus',$global_conf);
+  var_dump($a->input);
+//print $a->software_qsub($d);
